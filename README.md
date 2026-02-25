@@ -1,77 +1,78 @@
-# AI Essay Batch Grader (Desktop App)
+# Essay Grader (Desktop App)
 
-This tool helps a high-school English teacher grade 100+ essays with AI assistance, while keeping full teacher control.
+A local desktop tool for high-school English teachers to batch-grade essays with AI assistance while keeping full teacher control.
 
-## Highlights of the new review interface
+## What’s in this refactor
 
-- **Modern split view** for essay review:
-  - Left: Word-like essay viewer (rendered HTML from `.docx`) with inline images.
-  - Right: grading controls (summary, compliance checklist, rubric scoring, feedback, overall grade).
-- **No raw JSON in the UI**.
-- **Yellow human-judgment highlights** in the essay viewer.
-- **Autosave** with visible status (`Saving…`, `Saved ✓`, `Save failed`).
-- **Tabbed grading panel**: Summary, Compliance, Rubric, Flags, Overall, and Diff.
+- New **AppShell** with top navigation: **Setup | Review | Integrity | Export**.
+- Setup page now uses clean upload cards for Rubric, Assignment, and Student Essays.
+- Review page is a focused 3-column workspace:
+  - left: student list/search/filter,
+  - center: paper-like essay viewer with inline images + yellow highlights,
+  - right: grading panel (Summary & Compliance, Rubric, Flags, Overall, Diff).
+- Integrity page shows similarity table + AI-usage heuristic table.
+- Export page provides dedicated export actions.
 
-## What the app does
+All existing backend capabilities are preserved:
+- AI grading pipeline
+- Session persistence
+- Integrity computations
+- Canvas CSV export + per-student feedback DOCX export
 
-- Uploads batch essays (`.docx`), rubric (`.docx/.pdf` or pasted text), assignment (`.docx/.pdf`).
-- Uses OpenAI to:
-  - parse rubric dimensions and assignment requirements,
-  - score each rubric category,
-  - generate category feedback,
-  - write 3–5 sentence summary,
-  - add assignment compliance notes,
-  - flag human-judgment areas with excerpts/questions.
-- Runs integrity checks:
-  - cross-essay similarity,
-  - AI usage signal score (non-definitive, never sole evidence).
-- Saves sessions locally for resume.
-- Exports:
-  - Canvas-ready CSV,
-  - per-student `.docx` feedback files.
+---
 
-## Install (step-by-step)
+## Install
 
-1. Install Python 3.11+ from https://www.python.org/downloads/
-2. Open `launchers/`.
-3. Double-click:
-   - Mac: `Launch_Grader.command`
+1. Install Python 3.11+.
+2. Open the `launchers/` folder.
+3. Run:
+   - macOS: `Launch_Grader.command`
    - Windows: `Launch_Grader.bat`
 
-The launcher creates a local virtual environment, installs dependencies, and starts the app.
+---
 
-## First run
+## Workflow
 
-1. Open **Settings** tab.
-2. Paste OpenAI API key.
-3. Confirm model and worker count.
-4. Click **Save Settings**.
+### 1) Setup
+- Upload/paste rubric.
+- Upload/paste assignment sheet.
+- Upload all student `.docx` essays.
+- Save API settings (key/model/workers).
+- Click **Start Grading**.
 
-## Grading workflow
+### 2) Review
+- Search/filter students in left sidebar.
+- Click a student to load essay + grading data.
+- Edit scores/feedback in right tabs.
+- Use autosave or **Save Changes**.
+- Click **Finalize** when done.
 
-1. **Batch Setup**
-   - Upload essays (`.docx`).
-   - Upload rubric and assignment docs (or paste rubric text).
-   - Start AI grading.
-2. **Essay Review**
-   - Select a student in left sidebar (or leave unselected to keep placeholder state).
-   - Read essay in left pane (with images rendered inline and scrollable in the web viewer).
-   - Use right-side tabs to edit:
-     - **Summary**
-     - **Compliance** (status + notes + per-row revert)
-     - **Rubric** (score, label, feedback, per-dimension revert, revert all)
-     - **Flags** (review questions, teacher notes, jump to highlight)
-     - **Overall**
-     - **Diff** (All Changes or filtered by section)
-   - Use toolbar actions to Save, Mark Finalized, Export, and Next/Previous student.
-3. **Integrity**
-   - Review similarity flags and AI usage signals.
-4. **Export**
-   - Use menu action (or existing export controls) to write Canvas CSV and per-student feedback docs.
+### 3) Integrity
+- Review high-similarity pairs and AI-usage signal scores (non-definitive).
+
+### 4) Export
+- Export Canvas CSV.
+- Export student feedback DOCX files.
+
+---
+
+## Smoke test checklist
+
+1. Open app and verify top nav appears with Setup/Review/Integrity/Export.
+2. On Setup, upload sample files and confirm counts/pills update.
+3. Start grading; verify progress updates and failures do not crash batch.
+4. In Review, select students; verify:
+   - center essay scrolls to bottom,
+   - images render inline,
+   - yellow highlights are visible,
+   - clicking highlight focuses Flags.
+5. Edit rubric/compliance/overall fields and verify save status changes to `Saved ✓`.
+6. Open Diff mode and verify edits are listed.
+7. Export from Export page and verify CSV + DOCX outputs are created.
+
+---
 
 ## Notes
 
-- Essay rendering caches converted HTML for faster navigation.
-- If an image cannot be rendered, document remains readable and a fallback marker is shown.
-- Batch processing is parallel and resilient: one essay failure does not stop the batch.
-
+- AI-usage heuristic is only a signal and **must not** be used as sole evidence of misconduct.
+- Session data is stored locally in `sessions/`.
