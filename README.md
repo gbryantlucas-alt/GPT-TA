@@ -1,101 +1,73 @@
 # AI Essay Batch Grader (Desktop App)
 
-This app is built for a high school English teacher who wants to grade 100+ essays with AI help and still make the final decisions.
+This tool helps a high-school English teacher grade 100+ essays with AI assistance, while keeping full teacher control.
 
-## What this app does
+## Highlights of the new review interface
 
-- Uploads many student essays at once (`.docx` files).
-- Uploads rubric and assignment documents (`.docx` or `.pdf`) or lets you paste rubric text.
-- Uses OpenAI (ChatGPT) to:
+- **Modern split view** for essay review:
+  - Left: Word-like essay viewer (rendered HTML from `.docx`) with inline images.
+  - Right: grading controls (summary, compliance checklist, rubric scoring, feedback, overall grade).
+- **No raw JSON in the UI**.
+- **Yellow human-judgment highlights** in the essay viewer.
+- **Autosave** with visible status (`Saving…`, `Saved ✓`, `Save failed`).
+- **Diff tab** to compare AI original grading vs teacher edits.
+
+## What the app does
+
+- Uploads batch essays (`.docx`), rubric (`.docx/.pdf` or pasted text), assignment (`.docx/.pdf`).
+- Uses OpenAI to:
+  - parse rubric dimensions and assignment requirements,
   - score each rubric category,
-  - write category-by-category feedback,
-  - summarize each essay in 3–5 sentences,
+  - generate category feedback,
+  - write 3–5 sentence summary,
   - add assignment compliance notes,
-  - flag subjective judgment calls for manual teacher review.
-- Runs two integrity checks:
+  - flag human-judgment areas with excerpts/questions.
+- Runs integrity checks:
   - cross-essay similarity,
-  - AI-usage signal score (with a clear caveat that it is **not proof**).
-- Lets the teacher edit all scores/comments and mark essays finalized.
-- Saves progress locally so you can close the app and come back later.
+  - AI usage signal score (non-definitive, never sole evidence).
+- Saves sessions locally for resume.
 - Exports:
-  - one Canvas-ready CSV,
-  - one feedback `.docx` per student.
+  - Canvas-ready CSV,
+  - per-student `.docx` feedback files.
 
----
+## Install (step-by-step)
 
-## Installation (step-by-step, no technical experience needed)
+1. Install Python 3.11+ from https://www.python.org/downloads/
+2. Open `launchers/`.
+3. Double-click:
+   - Mac: `Launch_Grader.command`
+   - Windows: `Launch_Grader.bat`
 
-### 1) Install Python
+The launcher creates a local virtual environment, installs dependencies, and starts the app.
 
-- Go to https://www.python.org/downloads/
-- Install Python 3.11+.
-- On Windows, make sure you check **“Add Python to PATH”** during install.
+## First run
 
-### 2) Get your OpenAI API key
-
-- Sign in to OpenAI and create an API key.
-- Keep it ready. You will paste it into the app's **Settings** screen.
-
-### 3) Launch the app
-
-#### On Mac
-- Open the `launchers` folder.
-- Double-click `Launch_Grader.command`.
-- If macOS blocks it the first time, right-click -> Open.
-
-#### On Windows
-- Open the `launchers` folder.
-- Double-click `Launch_Grader.bat`.
-
-The launcher will automatically:
-1. create a local virtual environment,
-2. install dependencies,
-3. start the app.
-
----
-
-## First-time setup in the app
-
-1. Go to **Settings** tab.
+1. Open **Settings** tab.
 2. Paste OpenAI API key.
-3. Choose model (default is `gpt-4.1-mini`).
-4. Choose number of parallel workers (default: 6).
-5. Click **Save Settings**.
+3. Confirm model and worker count.
+4. Click **Save Settings**.
 
----
+## Grading workflow
 
-## Typical grading workflow
+1. **Batch Setup**
+   - Upload essays (`.docx`).
+   - Upload rubric and assignment docs (or paste rubric text).
+   - Start AI grading.
+2. **Essay Review**
+   - Select a student in left sidebar.
+   - Read essay in left pane (with images rendered inline).
+   - Edit summary, compliance, rubric scores/feedback, overall grade in right pane.
+   - Use **Revert** per field or **Revert All**.
+   - Use **Diff** tab to compare AI original vs teacher edits.
+   - Mark finalized when done.
+3. **Integrity**
+   - Review similarity flags and AI usage signals.
+4. **Export**
+   - Use menu action (or existing export controls) to write Canvas CSV and per-student feedback docs.
 
-1. In **Batch Setup**:
-   - click **Upload Essays (.docx)** and select all student essays,
-   - upload rubric file OR paste rubric text,
-   - upload assignment sheet.
-2. Click **Start AI Grading**.
-3. Move to **Essay Review** tab:
-   - select each student,
-   - edit summary/scores/comments as needed,
-   - click **Mark Finalized**.
-4. Check the **Integrity** tab for similarity and AI-signal flags.
-5. Click **Export Final Outputs**:
-   - choose an output folder,
-   - app creates Canvas CSV + per-student feedback files.
+## Notes
 
----
-
-## Important notes
-
-- AI grading is a draft assistant, not an autopilot.
-- Subjective dimensions are intentionally flagged for your judgment.
-- AI-usage signal score is **non-definitive** and must never be sole evidence of dishonesty.
-- If one essay errors during processing, the app logs it and continues with the rest.
-- Session state is auto-saved in the `sessions/` folder.
-
----
-
-## Troubleshooting
-
-- **“Missing API key”**: add key in Settings and click Save.
-- **No output file**: check that essays are finalized and you selected an export folder.
-- **A single essay fails**: open that student record (status `error`), fix file content, rerun batch.
-- **First launch is slow**: normal; dependencies are installing.
+- Essay rendering caches converted HTML for faster navigation.
+- If an image cannot be rendered, document remains readable and a fallback marker is shown.
+- Batch processing is parallel and resilient: one essay failure does not stop the batch.
 

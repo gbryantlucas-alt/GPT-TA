@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Callable
 
 from grader_app.ai_client import AIClient
@@ -38,21 +39,24 @@ class GradingEngine:
     ) -> tuple[str, EssayResult, str]:
         text = read_text(file_path)
         student_id = infer_student_id(file_path, text)
-        result = EssayResult(student_id=student_id, file_path=file_path, status="in_progress")
+        result = EssayResult(student_id=student_id, file_path=file_path, file_name=Path(file_path).name, status="ai graded")
         try:
             graded = self.ai.grade_essay(text, student_id, rubric_dimensions, assignment_requirements, subjective_dimensions)
             result.summary = graded.get("summary", "")
             result.category_scores = [CategoryScore(**s) for s in graded.get("category_scores", [])]
             result.overall_grade = graded.get("overall_grade", 0)
             result.overall_note = graded.get("overall_note", "")
-            result.compliance = [AssignmentComplianceItem(requirement=i.get("requirement", ""), status=i.get("status", ""), note=i.get("note", "")) for i in graded.get("assignment_compliance", [])]
+            result.compliance = [
+                AssignmentComplianceItem(requirement=i.get("requirement", ""), status=i.get("status", ""), note=i.get("note", ""))
+                for i in graded.get("assignment_compliance", [])
+            ]
             result.annotations = [Annotation(**a) for a in graded.get("annotations", [])]
             score, note = ai_usage_signal_score(text)
             result.ai_suspicion_score = score
             result.ai_suspicion_note = note
-            result.status = "unreviewed"
-        except Exception as exc:  # continue batch on failure
-            result.status = "error"
+            result.refresh_ai_snapshot()
+        except Exception as exc:
+            result.status = "failed"
             result.error = f"{exc}\n{traceback.format_exc()}"
         return student_id, result, text
 
