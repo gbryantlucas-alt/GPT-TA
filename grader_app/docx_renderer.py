@@ -78,7 +78,8 @@ class DocxHtmlRenderer:
                 unresolved_flags.append(idx)
 
         css = """
-        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.55; padding: 18px; color:#1f2937; }
+        html, body { height: auto !important; overflow: auto !important; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.55; padding: 18px; color:#1f2937; margin:0; }
         h1,h2,h3 { color:#111827; margin-top: 18px; }
         p { margin: 0 0 10px 0; }
         .human-flag { background: #fff59d; padding: 1px 2px; border-radius:2px; }

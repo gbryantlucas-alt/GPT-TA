@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 
 from grader_app.controller import GraderController
@@ -235,6 +236,7 @@ class MainWindow(QMainWindow):
         root.addWidget(split)
 
         self.essay_view = QWebEngineView()
+        self.essay_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.essay_page = EssayPage(self.essay_view)
         self.essay_page.flag_clicked.connect(self.focus_flag)
         self.essay_page.image_clicked.connect(self.open_image_dialog)
