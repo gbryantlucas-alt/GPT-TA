@@ -17,6 +17,7 @@ class Annotation:
     dimension: str
     excerpt: str
     question: str
+    teacher_note: str = ""
 
 
 @dataclass

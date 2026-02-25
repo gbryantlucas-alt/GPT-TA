@@ -10,7 +10,7 @@ This tool helps a high-school English teacher grade 100+ essays with AI assistan
 - **No raw JSON in the UI**.
 - **Yellow human-judgment highlights** in the essay viewer.
 - **Autosave** with visible status (`Saving…`, `Saved ✓`, `Save failed`).
-- **Diff tab** to compare AI original grading vs teacher edits.
+- **Tabbed grading panel**: Summary, Compliance, Rubric, Flags, Overall, and Diff.
 
 ## What the app does
 
@@ -54,12 +54,16 @@ The launcher creates a local virtual environment, installs dependencies, and sta
    - Upload rubric and assignment docs (or paste rubric text).
    - Start AI grading.
 2. **Essay Review**
-   - Select a student in left sidebar.
-   - Read essay in left pane (with images rendered inline).
-   - Edit summary, compliance, rubric scores/feedback, overall grade in right pane.
-   - Use **Revert** per field or **Revert All**.
-   - Use **Diff** tab to compare AI original vs teacher edits.
-   - Mark finalized when done.
+   - Select a student in left sidebar (or leave unselected to keep placeholder state).
+   - Read essay in left pane (with images rendered inline and scrollable in the web viewer).
+   - Use right-side tabs to edit:
+     - **Summary**
+     - **Compliance** (status + notes + per-row revert)
+     - **Rubric** (score, label, feedback, per-dimension revert, revert all)
+     - **Flags** (review questions, teacher notes, jump to highlight)
+     - **Overall**
+     - **Diff** (All Changes or filtered by section)
+   - Use toolbar actions to Save, Mark Finalized, Export, and Next/Previous student.
 3. **Integrity**
    - Review similarity flags and AI usage signals.
 4. **Export**
