@@ -34,6 +34,12 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QSplitter,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+    QSizePolicy,
 )
 
 from grader_app.controller import GraderController
@@ -211,6 +217,77 @@ class GradingPanel(QWidget):
     def _emit_edit(self):
         if not self.loading:
             self.edited.emit()
+        self.current_sid: str | None = None
+        self.category_widgets: dict[str, dict] = {}
+        self.compliance_widgets: list[dict] = []
+        self.annotation_widgets: dict[int, QWidget] = {}
+
+        outer = QVBoxLayout(self)
+        self.student_header = QLabel("Select a student")
+        self.student_header.setObjectName("StudentHeader")
+        outer.addWidget(self.student_header)
+
+        self.save_status = QLabel("Saved ✓")
+        self.save_status.setObjectName("SaveStatus")
+        outer.addWidget(self.save_status)
+
+        self.view_tabs = QTabWidget()
+        outer.addWidget(self.view_tabs)
+
+        current = QWidget()
+        current_layout = QVBoxLayout(current)
+
+        current_layout.addWidget(QLabel("Essay Summary"))
+        self.summary = QTextEdit()
+        self.summary.textChanged.connect(self.edited)
+        current_layout.addWidget(self.summary)
+
+        current_layout.addWidget(QLabel("Assignment Compliance"))
+        self.compliance_container = QWidget()
+        self.compliance_layout = QVBoxLayout(self.compliance_container)
+        current_layout.addWidget(self.compliance_container)
+
+        current_layout.addWidget(QLabel("Rubric"))
+        self.rubric_container = QWidget()
+        self.rubric_layout = QVBoxLayout(self.rubric_container)
+        current_layout.addWidget(self.rubric_container)
+
+        current_layout.addWidget(QLabel("Overall Grade"))
+        grade_line = QHBoxLayout()
+        self.overall = QDoubleSpinBox()
+        self.overall.setMaximum(1000)
+        self.overall.valueChanged.connect(self.edited)
+        grade_line.addWidget(self.overall)
+        self.overall_note = QTextEdit()
+        self.overall_note.setMaximumHeight(80)
+        self.overall_note.textChanged.connect(self.edited)
+        current_layout.addLayout(grade_line)
+        current_layout.addWidget(self.overall_note)
+
+        self.flags_title = QLabel("Human review flags")
+        current_layout.addWidget(self.flags_title)
+        self.flags_container = QWidget()
+        self.flags_layout = QVBoxLayout(self.flags_container)
+        current_layout.addWidget(self.flags_container)
+
+        self.view_tabs.addTab(current, "Current")
+
+        self.diff_box = QTextEdit()
+        self.diff_box.setReadOnly(True)
+        self.view_tabs.addTab(self.diff_box, "Diff")
+
+        btns = QHBoxLayout()
+        self.save_btn = QPushButton("Save")
+        self.revert_all_btn = QPushButton("Revert All")
+        self.prev_btn = QPushButton("Previous")
+        self.next_btn = QPushButton("Next")
+        self.final_btn = QPushButton("Mark Finalized")
+        btns.addWidget(self.save_btn)
+        btns.addWidget(self.revert_all_btn)
+        btns.addWidget(self.prev_btn)
+        btns.addWidget(self.next_btn)
+        btns.addWidget(self.final_btn)
+        outer.addLayout(btns)
 
     def set_save_status(self, text: str):
         self.save_status.setText(text)
@@ -258,6 +335,16 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._apply_styles()
         self.set_no_selection_state()
+        self.batch_tab = self._build_batch_tab()
+        self.review_tab = self._build_review_tab()
+        self.integrity_tab = self._build_integrity_tab()
+        self.settings_tab = self._build_settings_tab()
+        self.tabs.addTab(self.batch_tab, "Batch Setup")
+        self.tabs.addTab(self.review_tab, "Essay Review")
+        self.tabs.addTab(self.integrity_tab, "Integrity")
+        self.tabs.addTab(self.settings_tab, "Settings")
+        self._build_menu()
+        self._apply_styles()
 
     def _build_batch_tab(self):
         w = QWidget()
@@ -273,6 +360,17 @@ class MainWindow(QMainWindow):
         for text, fn in buttons:
             b = QPushButton(text)
             b.clicked.connect(fn)
+        b1 = QPushButton("Upload Essays (.docx)")
+        b1.clicked.connect(self.select_essays)
+        b2 = QPushButton("Upload Rubric File")
+        b2.clicked.connect(self.select_rubric_file)
+        b3 = QPushButton("Upload Assignment File")
+        b3.clicked.connect(self.select_assignment_file)
+        b4 = QPushButton("Load Saved Session")
+        b4.clicked.connect(self.load_session)
+        b5 = QPushButton("Start AI Grading")
+        b5.clicked.connect(self.start_grading)
+        for b in [b1, b2, b3, b4, b5]:
             row.addWidget(b)
         l.addLayout(row)
         self.rubric_text = QTextEdit()
@@ -297,6 +395,12 @@ class MainWindow(QMainWindow):
 
         self.review_splitter = QSplitter(Qt.Horizontal)
         root.addWidget(self.review_splitter, 1)
+        self.student_list.currentTextChanged.connect(self.on_student_select)
+        self.student_list.setMaximumWidth(260)
+        root.addWidget(self.student_list)
+
+        split = QSplitter(Qt.Horizontal)
+        root.addWidget(split)
 
         self.essay_view = QWebEngineView()
         self.essay_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -322,6 +426,21 @@ class MainWindow(QMainWindow):
         self.panel.next_btn.clicked.connect(self.select_next)
         self.panel.revert_all_btn.clicked.connect(self.revert_all)
         self.panel.diff_filter.currentTextChanged.connect(self.refresh_diff_current)
+        split.addWidget(self.essay_view)
+
+        panel_wrap = QWidget()
+        panel_layout = QVBoxLayout(panel_wrap)
+        self.panel = GradingPanel()
+        panel_layout.addWidget(self.panel)
+        split.addWidget(panel_wrap)
+        split.setSizes([980, 420])
+
+        self.panel.edited.connect(self.queue_autosave)
+        self.panel.save_btn.clicked.connect(self.save_current)
+        self.panel.revert_all_btn.clicked.connect(self.revert_all)
+        self.panel.next_btn.clicked.connect(self.select_next)
+        self.panel.prev_btn.clicked.connect(self.select_prev)
+        self.panel.final_btn.clicked.connect(self.mark_finalized)
         return w
 
     def _build_integrity_tab(self):
@@ -350,6 +469,16 @@ class MainWindow(QMainWindow):
     def _build_menu(self):
         menu = self.menuBar().addMenu("File")
         menu.addAction("Export Final Outputs", self.export_outputs)
+        save = QPushButton("Save Settings")
+        save.clicked.connect(self.save_settings)
+        l.addRow(save)
+        return w
+
+
+    def _build_menu(self):
+        menu = self.menuBar().addMenu("File")
+        export_action = menu.addAction("Export Final Outputs")
+        export_action.triggered.connect(self.export_outputs)
 
     def _apply_styles(self):
         self.setStyleSheet(
@@ -375,6 +504,14 @@ class MainWindow(QMainWindow):
             "model": self.model.text().strip(),
             "workers": int(self.workers.text() or 6),
         }
+            QTextEdit, QLineEdit, QListWidget, QComboBox, QDoubleSpinBox { background:white; border:1px solid #d1d5db; border-radius:6px; padding:6px; }
+            #StudentHeader { font-size:16px; font-weight:700; }
+            #SaveStatus { color:#047857; font-weight:600; }
+            """
+        )
+
+    def save_settings(self):
+        self.settings = {"api_key": self.api_key.text().strip(), "model": self.model.text().strip(), "workers": int(self.workers.text() or 6)}
         SETTINGS_PATH.write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
         QMessageBox.information(self, "Saved", "Settings saved.")
 
@@ -410,6 +547,7 @@ class MainWindow(QMainWindow):
             self.essay_paths,
             int(self.workers.text() or 6),
         )
+        self.worker = BatchWorker(self.controller, self.api_key.text().strip(), self.model.text().strip(), self.essay_paths, int(self.workers.text() or 6))
         self.worker.progress.connect(self.on_batch_progress)
         self.worker.done.connect(self.on_batch_done)
         self.worker.failed.connect(lambda e: QMessageBox.critical(self, "Batch failed", e))
@@ -614,6 +752,150 @@ class MainWindow(QMainWindow):
                 ann.teacher_note = note.text().strip()
 
         essay.overall_grade = self.panel.overall_score.value()
+        self.student_list.clear()
+        for sid in self.controller.student_ids():
+            essay = self.controller.session.essays[sid]
+            item = QListWidgetItem(f"{sid} · {self.controller.status_label(essay.status)}")
+            item.setData(Qt.UserRole, sid)
+            self.student_list.addItem(item)
+
+    def on_student_select(self, _):
+        item = self.student_list.currentItem()
+        if not item:
+            return
+        sid = item.data(Qt.UserRole)
+        self.current_sid = sid
+        essay = self.controller.session.essays[sid]
+        self.panel.current_sid = sid
+        self.panel.student_header.setText(f"{sid} • {essay.file_name or Path(essay.file_path).name}")
+
+        rendered = self.renderer.render(essay.file_path, essay.annotations)
+        self.essay_view.setHtml(rendered.html)
+        self.build_panel(essay, rendered.unresolved_flags)
+
+    def build_panel(self, essay, unresolved_flags: list[int]):
+        self.panel.summary.blockSignals(True)
+        self.panel.summary.setPlainText(essay.summary)
+        self.panel.summary.blockSignals(False)
+
+        while self.panel.compliance_layout.count():
+            c = self.panel.compliance_layout.takeAt(0)
+            if c.widget():
+                c.widget().deleteLater()
+        self.panel.compliance_widgets = []
+
+        for idx, item in enumerate(essay.compliance):
+            row = QWidget()
+            rl = QHBoxLayout(row)
+            req = QLabel(item.requirement)
+            req.setWordWrap(True)
+            status = QComboBox()
+            status.addItems(["met", "partial", "missing"])
+            status.setCurrentText(item.status or "partial")
+            note = QLineEdit(item.note)
+            revert = QPushButton("Revert")
+            rl.addWidget(req, 3)
+            rl.addWidget(status, 1)
+            rl.addWidget(note, 2)
+            rl.addWidget(revert)
+            self.panel.compliance_layout.addWidget(row)
+            status.currentTextChanged.connect(self.queue_autosave)
+            note.textChanged.connect(self.queue_autosave)
+            revert.clicked.connect(lambda _=None, i=idx, s=status, n=note: self.revert_compliance_field(i, s, n))
+            self.panel.compliance_widgets.append({"status": status, "note": note})
+
+        while self.panel.rubric_layout.count():
+            c = self.panel.rubric_layout.takeAt(0)
+            if c.widget():
+                c.widget().deleteLater()
+        self.panel.category_widgets = {}
+
+        for i, cat in enumerate(essay.category_scores):
+            box = QFrame()
+            bl = QVBoxLayout(box)
+            name = QLabel(cat.dimension)
+            score = QDoubleSpinBox()
+            score.setMaximum(100)
+            score.setValue(float(cat.score))
+            label = QLabel(cat.label)
+            fb = QTextEdit(cat.feedback)
+            fb.setMaximumHeight(80)
+            needs = QLabel("Needs human review")
+            needs.setVisible(any(a.dimension == cat.dimension for a in essay.annotations))
+            revert = QPushButton("Revert")
+            top = QHBoxLayout()
+            top.addWidget(name)
+            top.addWidget(needs)
+            bl.addLayout(top)
+            bl.addWidget(score)
+            bl.addWidget(label)
+            bl.addWidget(fb)
+            bl.addWidget(revert)
+            self.panel.rubric_layout.addWidget(box)
+            score.valueChanged.connect(lambda _=None, i=i: self.update_label_from_score(i))
+            score.valueChanged.connect(self.queue_autosave)
+            fb.textChanged.connect(self.queue_autosave)
+            revert.clicked.connect(lambda _=None, i=i, s=score, f=fb: self.revert_category_field(i, s, f))
+            self.panel.category_widgets[cat.dimension] = {"score": score, "label": label, "feedback": fb, "index": i}
+
+        self.panel.overall.blockSignals(True)
+        self.panel.overall.setValue(float(essay.overall_grade))
+        self.panel.overall.blockSignals(False)
+        self.panel.overall_note.blockSignals(True)
+        self.panel.overall_note.setPlainText(essay.overall_note)
+        self.panel.overall_note.blockSignals(False)
+
+        while self.panel.flags_layout.count():
+            c = self.panel.flags_layout.takeAt(0)
+            if c.widget():
+                c.widget().deleteLater()
+        for idx, ann in enumerate(essay.annotations):
+            txt = f"{ann.dimension}: {ann.question}"
+            if idx in unresolved_flags:
+                txt += " (Locate required)"
+            lbl = QLabel(txt)
+            lbl.setWordWrap(True)
+            self.panel.flags_layout.addWidget(lbl)
+
+        self.refresh_diff_view(essay)
+
+    def update_label_from_score(self, cat_index: int):
+        sid = self.current_sid
+        if not sid:
+            return
+        essay = self.controller.session.essays[sid]
+        cat = essay.category_scores[cat_index]
+        score = self.panel.category_widgets[cat.dimension]["score"].value()
+        labels = [x.strip() for x in cat.label.split("/") if x.strip()] or [cat.label]
+        if len(labels) == 1:
+            label = labels[0]
+        elif score < 0.4 * max(1, score):
+            label = labels[0]
+        elif score < 0.75 * max(1, score):
+            label = labels[min(1, len(labels) - 1)]
+        else:
+            label = labels[-1]
+        self.panel.category_widgets[cat.dimension]["label"].setText(label)
+
+    def queue_autosave(self):
+        self.panel.set_save_status("Saving…")
+        self.autosave_timer.start(800)
+
+    def _sync_ui_to_model(self):
+        sid = self.current_sid
+        if not sid:
+            return
+        essay = self.controller.session.essays[sid]
+        essay.summary = self.panel.summary.toPlainText().strip()
+        for i, c in enumerate(essay.compliance):
+            c.status = self.panel.compliance_widgets[i]["status"].currentText()
+            c.note = self.panel.compliance_widgets[i]["note"].text().strip()
+        for cat in essay.category_scores:
+            w = self.panel.category_widgets[cat.dimension]
+            cat.score = w["score"].value()
+            cat.label = w["label"].text().strip()
+            cat.feedback = w["feedback"].toPlainText().strip()
+        essay.overall_grade = self.panel.overall.value()
         essay.overall_note = self.panel.overall_note.toPlainText().strip()
         if essay.status == "ai graded":
             essay.status = "reviewed"
@@ -665,6 +947,44 @@ class MainWindow(QMainWindow):
         if not self.current_sid:
             return
         essay = self.controller.session.essays[self.current_sid]
+            self._sync_ui_to_model()
+            self.controller.save_session()
+            self.panel.set_save_status("Saved ✓")
+            if self.current_sid:
+                self.refresh_students()
+            if self.current_sid:
+                self.refresh_diff_view(self.controller.session.essays[self.current_sid])
+        except Exception:
+            self.panel.set_save_status("Save failed (click Save to retry)")
+
+    def save_current(self):
+        self.panel.set_save_status("Saving…")
+        self.autosave_timer.stop()
+        self.autosave()
+
+    def revert_category_field(self, idx: int, score_widget: QDoubleSpinBox, feedback_widget: QTextEdit):
+        sid = self.current_sid
+        if not sid:
+            return
+        base = self.controller.session.essays[sid].ai_original.category_scores[idx]
+        score_widget.setValue(float(base.score))
+        feedback_widget.setPlainText(base.feedback)
+        self.queue_autosave()
+
+    def revert_compliance_field(self, idx: int, status_widget: QComboBox, note_widget: QLineEdit):
+        sid = self.current_sid
+        if not sid:
+            return
+        base = self.controller.session.essays[sid].ai_original.compliance[idx]
+        status_widget.setCurrentText(base.status)
+        note_widget.setText(base.note)
+        self.queue_autosave()
+
+    def revert_all(self):
+        sid = self.current_sid
+        if not sid:
+            return
+        essay = self.controller.session.essays[sid]
         essay.summary = essay.ai_original.summary
         essay.category_scores = [CategoryScore(**c.__dict__) for c in essay.ai_original.category_scores]
         essay.compliance = [AssignmentComplianceItem(**c.__dict__) for c in essay.ai_original.compliance]
@@ -716,6 +1036,30 @@ class MainWindow(QMainWindow):
             lines = [ln for ln in lines if ln.startswith(f"[{filt}]")]
 
         self.panel.diff_view.setPlainText("\n".join(lines) if lines else "No changes.")
+        self.build_panel(essay, [])
+        self.queue_autosave()
+
+    def refresh_diff_view(self, essay):
+        lines = ["AI Original vs Teacher Edited\n"]
+        for i, cat in enumerate(essay.category_scores):
+            base = essay.ai_original.category_scores[i]
+            if base.score != cat.score:
+                lines.append(f"[Score] {cat.dimension}: {base.score} -> {cat.score}")
+            if base.feedback != cat.feedback:
+                lines.append(f"[Feedback] {cat.dimension} changed")
+                diff = difflib.ndiff(base.feedback.split(), cat.feedback.split())
+                lines.append(" ".join([d for d in diff if d.startswith("+") or d.startswith("-")]))
+        if essay.ai_original.overall_grade != essay.overall_grade:
+            lines.append(f"[Overall grade] {essay.ai_original.overall_grade} -> {essay.overall_grade}")
+        if essay.ai_original.overall_note != essay.overall_note:
+            lines.append("[Overall note] changed")
+        for i, item in enumerate(essay.compliance):
+            base = essay.ai_original.compliance[i]
+            if base.status != item.status or base.note != item.note:
+                lines.append(f"[Compliance] {item.requirement}: {base.status}/{base.note} -> {item.status}/{item.note}")
+        if len(lines) == 1:
+            lines.append("No teacher edits yet.")
+        self.panel.diff_box.setPlainText("\n".join(lines))
 
     def mark_finalized(self):
         if not self.current_sid:
@@ -735,6 +1079,17 @@ class MainWindow(QMainWindow):
         if row > 0:
             self.student_list.setCurrentRow(row - 1)
 
+    def focus_flag(self, index: int):
+        if not self.current_sid:
+            return
+        essay = self.controller.session.essays[self.current_sid]
+        if index < len(essay.annotations):
+            ann = essay.annotations[index]
+            QMessageBox.information(self, "Human Review Flag", f"{ann.dimension}\n\n{ann.question}")
+
+    def open_image_dialog(self, image_id: str):
+        QMessageBox.information(self, "Image Preview", "Image clicked. If it is small in the essay, zoom in with browser controls.")
+
     def refresh_integrity(self):
         lines = ["Cross-Essay Similarity\n======================="]
         for f in self.controller.session.integrity_flags:
@@ -743,6 +1098,7 @@ class MainWindow(QMainWindow):
         for sid, essay in sorted(self.controller.session.essays.items()):
             lines.append(f"{sid}: {essay.ai_suspicion_score} | {essay.ai_suspicion_note}")
         self.integrity_text.setPlainText("\n".join(lines))
+
 
     def export_outputs(self):
         if not self.controller.session.essays:
@@ -775,6 +1131,8 @@ def main():
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()
+    window = MainWindow()
+    window.show()
     sys.exit(app.exec())
 
 
